@@ -4,6 +4,7 @@
 [![docs.rs](https://img.shields.io/docsrs/getargs-derive)](https://docs.rs/getargs-derive)
 [![CI](https://github.com/AlixANNERAUD/getargs-derive/actions/workflows/check.yml/badge.svg)](https://github.com/AlixANNERAUD/getargs-derive/actions/workflows/check.yml)
 [![codecov](https://codecov.io/github/AlixANNERAUD/getargs-derive/graph/badge.svg?token=0C27GIS0BK)](https://codecov.io/github/AlixANNERAUD/getargs-derive)
+[![vulnerabilities](https://vulnerabilites.anneraud.fr/badges/6593f2922f0188801a838556073dfe26.svg)](https://vulnerabilites.anneraud.fr/organizations/alix_anneraud/projects/getargs_derive)
 [![License: MIT](https://img.shields.io/crates/l/getargs-derive.svg)](https://github.com/AlixANNERAUD/getargs-derive/blob/main/LICENSE)
 [![MSRV](https://img.shields.io/crates/msrv/getargs-derive.svg)](https://github.com/AlixANNERAUD/getargs-derive/blob/main/Cargo.toml)
 
