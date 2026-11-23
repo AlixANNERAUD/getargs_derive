@@ -1,7 +1,7 @@
 # Clap Compatibility
 
 The attributes follow the conventions of [Clap's derive API](https://docs.rs/clap/latest/clap/_derive/index.html):
-`#[arg(short, long)]`, `short = 'x'`, `long = "name"`, `default_value`, `default_value_t`, `env`, `help`, `long_help`, `value_name`, `value_enum`, `hide`, `help_heading`, `display_order`, the [alias keys][guide-aliases] (`alias`, `aliases`, `short_alias`, `short_aliases` and their `visible_` forms) and the `SetTrue`, `SetFalse` and `Count` actions mean the same thing here as they do in Clap,
+`#[arg(short, long)]`, `short = 'x'`, `long = "name"`, `default_value`, `default_value_t`, `env`, `help`, `long_help`, `value_name`, `value_enum`, `hide`, `help_heading`, `display_order`, `skip`, the [alias keys][guide-aliases] (`alias`, `aliases`, `short_alias`, `short_aliases` and their `visible_` forms) and the `SetTrue`, `SetFalse` and `Count` actions mean the same thing here as they do in Clap,
 and so do the `name`, `about`, `long_about`, `before_help`, `after_help`, `max_term_width`, `version` and `disable_help_flag` keys of `#[command(...)]`. Doc comments become help text the way they do in Clap, the generated help uses Clap's layout,
 `-h` and `--help` show the short and long help as in Clap, and [error messages][guide-errors] use Clap's wording.
 `Option<T>` fields are optional arguments that are `None` when absent, as in Clap.

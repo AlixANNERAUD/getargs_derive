@@ -1,0 +1,11 @@
+error: `skip` cannot be combined with `#[command(flatten)]`; remove one of them
+  --> tests/ui/skip_command.rs:17:11
+   |
+17 |     #[arg(skip)]
+   |           ^^^^
+
+error: `skip` cannot be combined with `#[command(subcommand)]`; remove one of them
+  --> tests/ui/skip_command.rs:23:11
+   |
+23 |     #[arg(skip)]
+   |           ^^^^

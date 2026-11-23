@@ -205,6 +205,9 @@ pub(super) fn args_impl(input: &DeriveInput, model: &Model) -> TokenStream {
     if let Some(subcommand) = &model.subcommand {
         tokens.push_subcommand(subcommand);
     }
+    for skip in &model.skipped {
+        tokens.push_skip(skip);
+    }
     let FieldTokens {
         state_types,
         initializers,

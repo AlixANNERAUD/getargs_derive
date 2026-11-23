@@ -11,7 +11,7 @@ pub(crate) use container::{ContainerModel, Keys, Version, parse_container, valid
 use field::Member;
 pub(crate) use field::{
     Alias, CollectionModel, DefaultValue, FieldKind, FieldModel, FlagAction, FlattenModel,
-    SubcommandModel, ValueParser,
+    SkipModel, SubcommandModel, ValueParser,
 };
 pub(crate) use relations::resolve_groups;
 
@@ -28,6 +28,7 @@ pub(crate) struct Model {
     pub(crate) fields: Vec<FieldModel>,
     pub(crate) flattened: Vec<(usize, FlattenModel)>,
     pub(crate) subcommand: Option<SubcommandModel>,
+    pub(crate) skipped: Vec<SkipModel>,
 }
 
 impl Model {
@@ -87,6 +88,7 @@ pub(crate) fn parse(input: &DeriveInput, keys: Keys) -> syn::Result<Model> {
     let mut models = Vec::new();
     let mut flattened = Vec::new();
     let mut subcommand: Option<SubcommandModel> = None;
+    let mut skipped = Vec::new();
     let mut built = true;
 
     for field in fields {
@@ -103,6 +105,7 @@ pub(crate) fn parse(input: &DeriveInput, keys: Keys) -> syn::Result<Model> {
                 )),
                 None => subcommand = Some(*model),
             },
+            Ok(Member::Skip(model)) => skipped.push(*model),
             Err(error) => {
                 built = false;
                 errors.push(error);
@@ -154,6 +157,7 @@ pub(crate) fn parse(input: &DeriveInput, keys: Keys) -> syn::Result<Model> {
             fields: models,
             flattened,
             subcommand,
+            skipped,
         }),
         None => Err(errors.0.expect("container errors are recorded")),
     }
