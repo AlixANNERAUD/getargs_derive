@@ -42,9 +42,10 @@ fn conversion(field: &FieldModel, value: &TokenStream, error_name: &str) -> Toke
     match &field.value_parser {
         _ if field.value_enum => quote! {
             <#value_ty as getargs_derive::ValueEnum>::from_value(#value).ok_or(
-                getargs_derive::Error::InvalidValue {
+                getargs_derive::Error::InvalidPossibleValue {
                     name: #error_name,
                     value: #value,
+                    possible_values: <#value_ty as getargs_derive::ValueEnum>::POSSIBLE_VALUES,
                 },
             )?
         },

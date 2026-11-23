@@ -197,9 +197,10 @@ fn elements_are_validated() {
     let error = Checked::from_args(["--level", "mid"].into_iter()).unwrap_err();
     assert_eq!(
         error,
-        Error::InvalidValue {
+        Error::InvalidPossibleValue {
             name: "--level <LEVEL>",
             value: "mid",
+            possible_values: &["low", "high"],
         }
     );
     let error = Checked::from_args(["--mode", "c"].into_iter()).unwrap_err();

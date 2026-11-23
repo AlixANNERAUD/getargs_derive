@@ -474,9 +474,10 @@ mod features {
             Cli::from_args_with_env(["in", "--color", "blue"].into_iter(), no_env).unwrap_err();
         assert_eq!(
             error,
-            Error::InvalidValue {
+            Error::InvalidPossibleValue {
                 name: "--color <COLOR>",
                 value: "blue",
+                possible_values: &["auto", "always", "never"],
             }
         );
     }

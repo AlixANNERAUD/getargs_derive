@@ -1398,3 +1398,11 @@ pub const fn utf8(bytes: &[u8]) -> &str {
         Err(_) => panic!("help text is not valid UTF-8"),
     }
 }
+
+/// The line of `help` starting at byte `start`, without its line break: the usage line.
+pub const fn usage_line(help: &'static str, start: usize) -> &'static str {
+    let end = line_end(help, start);
+    let (_, rest) = help.as_bytes().split_at(start);
+    let (line, _) = rest.split_at(end - start);
+    utf8(line)
+}

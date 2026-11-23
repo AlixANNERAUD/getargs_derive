@@ -82,17 +82,19 @@ fn value_enum_fields_reject_unknown_values() {
     let err = Cli::from_args(["--mode", "slow", "low"].into_iter()).unwrap_err();
     assert_eq!(
         err,
-        Error::InvalidValue {
+        Error::InvalidPossibleValue {
             name: "--mode <MODE>",
             value: "slow",
+            possible_values: &["fast", "slow-and-steady", "turbo", "raw"],
         }
     );
     let err = Cli::from_args(["medium"].into_iter()).unwrap_err();
     assert_eq!(
         err,
-        Error::InvalidValue {
+        Error::InvalidPossibleValue {
             name: "<TARGET>",
             value: "medium",
+            possible_values: &["low", "high"],
         }
     );
 }
@@ -196,9 +198,10 @@ fn manual_value_enum_reads_env() {
         .unwrap();
     assert_eq!(
         error,
-        Error::InvalidValue {
+        Error::InvalidPossibleValue {
             name: "--count <COUNT> [env: MANUAL_COUNT]",
             value: "three",
+            possible_values: &["one", "two"],
         }
     );
 }

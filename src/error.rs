@@ -201,7 +201,7 @@ pub enum Error<'a> {
     Version(&'static str),
 }
 
-impl Error<'_> {
+impl<'a> Error<'a> {
     /// Returns `true` if this is [`Error::Help`], i.e. the user asked for help rather than
     /// passing invalid arguments.
     #[must_use]
@@ -214,6 +214,31 @@ impl Error<'_> {
     #[must_use]
     pub fn is_version(&self) -> bool {
         matches!(self, Error::Version(_))
+    }
+
+    /// Pairs the error with the usage of the command, so that its `Display` ends with the usage
+    /// line and a hint to try `--help`, as Clap errors do. See [`WithUsage`].
+    ///
+    /// The usage of a struct deriving `GetArgs` is its `USAGE` constant. For an error raised
+    /// by a subcommand it is the usage of the struct holding the subcommand, not of the
+    /// subcommand.
+    ///
+    /// ```
+    /// # use getargs_derive::GetArgs;
+    /// #[derive(Debug, GetArgs)]
+    /// #[command(name = "copy")]
+    /// struct Cli<'a> {
+    ///     input: &'a str,
+    /// }
+    ///
+    /// let error = Cli::from_args(["a", "b"].into_iter()).unwrap_err();
+    /// assert_eq!(
+    ///     error.with_usage(Cli::USAGE).to_string(),
+    ///     "unexpected argument 'b' found\n\nUsage: copy [OPTIONS] <INPUT>\n\nFor more information, try '--help'."
+    /// );
+    /// ```
+    pub const fn with_usage(self, usage: Usage) -> WithUsage<'a> {
+        WithUsage { error: self, usage }
     }
 }
 
@@ -264,7 +289,9 @@ impl core::fmt::Display for Error<'_> {
                 f.write_str(">")
             }
             Error::MissingSubcommand(names) => {
-                f.write_str("a subcommand is required but one was not provided\n  [subcommands: ")?;
+                f.write_str(
+                    "a subcommand is required but one was not provided\n\n  [subcommands: ",
+                )?;
                 for (index, name) in names.iter().enumerate() {
                     if index > 0 {
                         f.write_str(", ")?;
@@ -349,3 +376,93 @@ impl core::fmt::Display for Error<'_> {
 }
 
 impl core::error::Error for Error<'_> {}
+
+/// The usage line of a command and whether it has a help flag, to remind the user of both after
+/// an argument error, as Clap does.
+///
+/// The `GetArgs` derive generates one as the `USAGE` constant of the struct, built at compile
+/// time without allocation. Its `Display` shows the usage line alone, e.g.
+/// `Usage: copy [OPTIONS] <INPUT>`. Pass it to [`Error::with_usage`] to show it after an error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Usage {
+    /// The usage line, starting with `Usage: ` and without a trailing newline.
+    pub line: &'static str,
+    /// Whether the command has a help flag, which the hint after the usage line refers to.
+    pub help_flag: bool,
+}
+
+impl Usage {
+    /// A usage with the line `line` and a help flag.
+    #[must_use]
+    pub const fn new(line: &'static str) -> Self {
+        Usage {
+            line,
+            help_flag: true,
+        }
+    }
+
+    /// Sets [`help_flag`](Self::help_flag).
+    #[must_use]
+    pub const fn help_flag(mut self, help_flag: bool) -> Self {
+        self.help_flag = help_flag;
+        self
+    }
+}
+
+impl core::fmt::Display for Usage {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.line)
+    }
+}
+
+/// An [`Error`] followed by a usage line and a help hint, returned by [`Error::with_usage`].
+///
+/// Its `Display` writes the message of the error, a blank line, the usage line, another blank
+/// line and `For more information, try '--help'.` (left out when the command has no help flag),
+/// like the end of a Clap error:
+///
+/// ```text
+/// invalid value 'x' for '--mode <MODE>'
+///   [possible values: fast, slow]
+///
+/// Usage: run [OPTIONS]
+///
+/// For more information, try '--help'.
+/// ```
+///
+/// [`Error::Help`] and [`Error::Version`] are not failures and are written alone.
+#[must_use]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WithUsage<'a> {
+    error: Error<'a>,
+    usage: Usage,
+}
+
+impl<'a> WithUsage<'a> {
+    /// The error being reported.
+    pub const fn error(&self) -> &Error<'a> {
+        &self.error
+    }
+
+    /// The usage shown after the error.
+    pub const fn usage(&self) -> &Usage {
+        &self.usage
+    }
+}
+
+impl core::fmt::Display for WithUsage<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.error)?;
+        if self.error.is_help() || self.error.is_version() {
+            return Ok(());
+        }
+        write!(f, "\n\n{}", self.usage)?;
+        if self.usage.help_flag {
+            f.write_str("\n\nFor more information, try '--help'.")?;
+        }
+        Ok(())
+    }
+}
+
+impl core::error::Error for WithUsage<'_> {}
