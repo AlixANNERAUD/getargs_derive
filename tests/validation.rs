@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use core::num::ParseIntError;
-use getargs_derive::{Error, GetArgs};
+use getargs_derive::{Error, GetArgs, Subcommand, Values};
 
 #[derive(Debug, PartialEq)]
 struct Port(u16);
@@ -319,4 +319,200 @@ fn env_values_are_validated() {
             possible_values: &["fast", "slow"]
         }
     );
+}
+
+fn unprivileged_port(value: &str) -> Result<u16, &'static str> {
+    match value.parse::<u16>() {
+        Ok(port) if port >= 1024 => Ok(port),
+        Ok(_) => Err("must be at least 1024"),
+        Err(_) => Err("not a port number"),
+    }
+}
+
+// Elided lifetimes tie the error to the value: it is kept as the reason too.
+fn no_dots(value: &str) -> Result<&str, &str> {
+    match value.find('.') {
+        Some(index) => Err(&value[index..]),
+        None => Ok(value),
+    }
+}
+
+type Reason = &'static str;
+
+fn even(value: &str) -> Result<u32, Reason> {
+    match value.parse::<u32>() {
+        Ok(number) if number % 2 == 0 => Ok(number),
+        _ => Err("must be an even number"),
+    }
+}
+
+fn owned_reason(value: &str) -> Result<u8, &'static &'static str> {
+    value.parse().map_err(|_| &"never shown")
+}
+
+#[derive(Debug, GetArgs)]
+#[command(name = "reasons")]
+struct Reasons<'a> {
+    #[arg(short, long, value_parser = unprivileged_port, default_value = "8080")]
+    port: u16,
+    #[arg(long, value_parser = no_dots)]
+    name: Option<&'a str>,
+    #[arg(long, value_parser = even, env = "REASONS_EVEN")]
+    even: Option<u32>,
+    #[arg(long, value_parser = owned_reason)]
+    other: Option<u8>,
+    #[arg(long, value_parser = parse_port)]
+    legacy: Option<Port>,
+    #[arg(short = 'I', long, value_parser = unprivileged_port, value_delimiter = ',')]
+    include: Values<u16, 4>,
+}
+
+#[test]
+fn str_errors_of_value_parsers_become_the_reason() {
+    let params = Reasons::from_args_with_env(["-p", "3000"].into_iter(), |_| None).unwrap();
+    assert_eq!(params.port, 3000);
+
+    let err = Reasons::from_args_with_env(["-p", "80"].into_iter(), |_| None).unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidValueReason {
+            name: "--port <PORT>",
+            value: "80",
+            reason: "must be at least 1024",
+        }
+    );
+    assert_eq!(
+        err.to_string(),
+        "invalid value '80' for '--port <PORT>': must be at least 1024"
+    );
+
+    let err = Reasons::from_args_with_env(["--name", "a.b"].into_iter(), |_| None).unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidValueReason {
+            name: "--name <NAME>",
+            value: "a.b",
+            reason: ".b",
+        }
+    );
+
+    let err = Reasons::from_args_with_env(["--even", "3"].into_iter(), |_| None).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "invalid value '3' for '--even <EVEN>': must be an even number"
+    );
+}
+
+#[test]
+fn other_errors_of_value_parsers_are_discarded() {
+    let err = Reasons::from_args_with_env(["--other", "x"].into_iter(), |_| None).unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidValue {
+            name: "--other <OTHER>",
+            value: "x",
+        }
+    );
+    let err = Reasons::from_args_with_env(["--legacy", "x"].into_iter(), |_| None).unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidValue {
+            name: "--legacy <LEGACY>",
+            value: "x",
+        }
+    );
+}
+
+#[test]
+fn reasons_for_env_defaults_and_collections() {
+    let err = Reasons::from_args_with_env([].into_iter(), |name: &str| {
+        (name == "REASONS_EVEN").then_some("5")
+    })
+    .unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidValueReason {
+            name: "--even <EVEN> [env: REASONS_EVEN]",
+            value: "5",
+            reason: "must be an even number",
+        }
+    );
+
+    let err = Reasons::from_args_with_env(["-I", "2000,22"].into_iter(), |_| None).unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidValueReason {
+            name: "--include <INCLUDE>",
+            value: "22",
+            reason: "must be at least 1024",
+        }
+    );
+}
+
+#[derive(Debug, GetArgs)]
+struct BadDefault {
+    #[arg(long, value_parser = unprivileged_port, default_value = "21")]
+    port: u16,
+}
+
+#[test]
+fn reasons_for_default_values() {
+    let err = BadDefault::from_args([].into_iter()).unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidValueReason {
+            name: "--port <PORT>",
+            value: "21",
+            reason: "must be at least 1024",
+        }
+    );
+}
+
+#[test]
+fn reasons_with_usage() {
+    let err = Reasons::from_args_with_env(["-p", "80"].into_iter(), |_| None).unwrap_err();
+    assert_eq!(
+        err.with_usage(Reasons::USAGE).to_string(),
+        "invalid value '80' for '--port <PORT>': must be at least 1024
+
+Usage: reasons [OPTIONS]
+
+For more information, try '--help'."
+    );
+}
+
+#[derive(Debug, PartialEq, Subcommand)]
+enum Commands {
+    Serve {
+        #[arg(long, value_parser = unprivileged_port)]
+        port: u16,
+    },
+}
+
+#[derive(Debug, GetArgs)]
+struct Server {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[test]
+fn reasons_in_subcommand_variants() {
+    let server = Server::from_args(["serve", "--port", "4000"].into_iter()).unwrap();
+    assert_eq!(server.command, Commands::Serve { port: 4000 });
+    let err = Server::from_args(["serve", "--port", "x"].into_iter()).unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidValueReason {
+            name: "--port <PORT>",
+            value: "x",
+            reason: "not a port number",
+        }
+    );
+}
+
+#[test]
+fn reasons_keep_the_error_small() {
+    // Three two-word fields, like `InvalidPossibleValue`: the new variant must not grow `Error`.
+    #[cfg(target_pointer_width = "64")]
+    assert_eq!(core::mem::size_of::<Error<'static>>(), 56);
 }

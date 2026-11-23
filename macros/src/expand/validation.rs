@@ -49,7 +49,19 @@ fn conversion(field: &FieldModel, value: &TokenStream, error_name: &str) -> Toke
                 },
             )?
         },
-        Some(ValueParser::Function(path)) => quote! { #path(#value).map_err(#invalid)? },
+        Some(ValueParser::Function(path)) => quote! {
+            match #path(#value) {
+                core::result::Result::Ok(__converted) => __converted,
+                core::result::Result::Err(__error) => {
+                    #[allow(unused_imports)]
+                    use getargs_derive::__private::{DropReason as _, KeepReason as _};
+                    return core::result::Result::Err(
+                        (&getargs_derive::__private::ParserError(__error))
+                            .__invalid_value(#error_name, #value),
+                    );
+                }
+            }
+        },
         _ if field.value_kind == ValueKind::Str => quote! { #value },
         _ => quote! { core::str::FromStr::from_str(#value).map_err(#invalid)? },
     }

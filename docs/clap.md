@@ -7,7 +7,7 @@ and so do the `name`, `about`, `long_about`, `before_help`, `after_help`, `max_t
 `Option<T>` fields are optional arguments that are `None` when absent, as in Clap.
 The `conflicts_with`, `requires`, `required_unless_present` and `group` relations behave as in Clap, with groups declared through a simpler `#[command(group(id = "...", required, multiple))]` syntax; see [Argument Relations][guide-relations].
 `#[derive(ValueEnum)]` with `#[value(name = "...")]` and `#[value(alias = "...")]` maps unit variants to accepted values as Clap's does.
-Values can be validated with `value_parser` (a parser function or an integer range) and `possible_values`, with Clap's error messages and `[possible values: ...]` help; see [Value Validation][guide-validation].
+Values can be validated with `value_parser` (a parser function or an integer range) and `possible_values`, with Clap's error messages and `[possible values: ...]` help; a parser function returning a `&str` error has it shown as the reason, as Clap shows the error of a custom parser; see [Value Validation][guide-validation].
 As in Clap, an option refuses a separate value starting with `-` unless it has `allow_hyphen_values` or, for negative numbers, `allow_negative_numbers` (also accepted on `#[command(...)]`), and a `last = true` positional is only filled after `--`.
 `getargs` limits these modes: `allow_hyphen_values` is not supported on positionals, and positionals only accept negative numbers through `from_args`; see [Parsing Modes][guide-parsing].
 Collection fields receive repeated values as in Clap: a repeated option appends one value per occurrence (`ArgAction::Append`), `value_delimiter` splits values,
