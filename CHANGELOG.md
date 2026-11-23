@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1](https://github.com/AlixANNERAUD/getargs_derive/compare/v0.1.0...v0.1.1) - 2026-11-23
+
+### Added
+
+- list possible values and add usage hints to argument errors ([#54](https://github.com/AlixANNERAUD/getargs_derive/pull/54))
+
+### Miscellaneous
+
+- set up Dependabot ([#45](https://github.com/AlixANNERAUD/getargs_derive/pull/45))
+- set up mise and Mr Boxington ([#44](https://github.com/AlixANNERAUD/getargs_derive/pull/44))
+- *(deps)* bump the cargo group with 3 updates ([#47](https://github.com/AlixANNERAUD/getargs_derive/pull/47))
+- track the dependencies in nanobom and show their badge ([#50](https://github.com/AlixANNERAUD/getargs_derive/pull/50))
+- lower the minimum supported Rust version to 1.85 ([#53](https://github.com/AlixANNERAUD/getargs_derive/pull/53))
+
 ## [0.1.0](https://github.com/AlixANNERAUD/getargs-derive/releases/tag/v0.1.0) - 2026-10-13
 
 ### Added
