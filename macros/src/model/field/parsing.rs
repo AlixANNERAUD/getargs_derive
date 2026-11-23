@@ -100,13 +100,13 @@ pub(super) fn build_parsing(raw: RawParsing, kind: &FieldKind, errors: &mut Erro
         ));
     }
 
-    if let Some(span) = last
-        && !matches!(kind, FieldKind::Positional)
-    {
-        errors.push(syn::Error::new(
-            span,
-            "`last` can only be used on positional arguments; remove `short` and `long`",
-        ));
+    if !matches!(kind, FieldKind::Positional) {
+        if let Some(span) = last {
+            errors.push(syn::Error::new(
+                span,
+                "`last` can only be used on positional arguments; remove `short` and `long`",
+            ));
+        }
     }
 
     Parsing {
@@ -139,19 +139,19 @@ pub(in crate::model) fn validate_last(fields: &[FieldModel], errors: &mut Errors
         .enumerate()
         .filter_map(|(index, field)| field.parsing.last_span.map(|span| (index, *field, span)))
         .collect();
-    if let [(_, first, _), others @ ..] = lasts.as_slice()
-        && !others.is_empty()
-    {
-        for (_, _, span) in others {
-            errors.push(syn::Error::new(
-                *span,
-                format!(
-                    "only one positional argument can use `last`, and `{}` already does",
-                    first.name
-                ),
-            ));
+    if let [(_, first, _), others @ ..] = lasts.as_slice() {
+        if !others.is_empty() {
+            for (_, _, span) in others {
+                errors.push(syn::Error::new(
+                    *span,
+                    format!(
+                        "only one positional argument can use `last`, and `{}` already does",
+                        first.name
+                    ),
+                ));
+            }
+            return;
         }
-        return;
     }
     for (index, field, span) in lasts {
         if index + 1 != positionals.len() {

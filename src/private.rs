@@ -909,13 +909,13 @@ impl Writer<'_> {
         let mut found = false;
         let mut index = 0;
         while index < count {
-            if let Some(entry) = shown(page.entries, index)
-                && visible_in(entry, title)
-            {
-                found = true;
-                let length = char_count(entry.label);
-                if length > width {
-                    width = length;
+            if let Some(entry) = shown(page.entries, index) {
+                if visible_in(entry, title) {
+                    found = true;
+                    let length = char_count(entry.label);
+                    if length > width {
+                        width = length;
+                    }
                 }
             }
             index += 1;
@@ -943,20 +943,20 @@ impl Writer<'_> {
             let mut next: Option<(usize, usize)> = None;
             index = 0;
             while index < count {
-                if let Some(entry) = shown(page.entries, index)
-                    && visible_in(entry, title)
-                {
-                    let key = (order(entry, index), index);
-                    let after = match previous {
-                        Some(previous) => greater(key, previous),
-                        None => true,
-                    };
-                    let better = match next {
-                        Some(next) => greater(next, key),
-                        None => true,
-                    };
-                    if after && better {
-                        next = Some(key);
+                if let Some(entry) = shown(page.entries, index) {
+                    if visible_in(entry, title) {
+                        let key = (order(entry, index), index);
+                        let after = match previous {
+                            Some(previous) => greater(key, previous),
+                            None => true,
+                        };
+                        let better = match next {
+                            Some(next) => greater(next, key),
+                            None => true,
+                        };
+                        if after && better {
+                            next = Some(key);
+                        }
                     }
                 }
                 index += 1;
@@ -1025,10 +1025,10 @@ impl Writer<'_> {
         let mut options = !page.reserved.is_empty();
         let mut index = 0;
         while index < count {
-            if let Some(entry) = shown(page.entries, index)
-                && !entry.positional
-            {
-                options = true;
+            if let Some(entry) = shown(page.entries, index) {
+                if !entry.positional {
+                    options = true;
+                }
             }
             index += 1;
         }
@@ -1037,11 +1037,11 @@ impl Writer<'_> {
         }
         index = 0;
         while index < count {
-            if let Some(entry) = shown(page.entries, index)
-                && entry.positional
-            {
-                self.str(" ");
-                self.str(entry.usage);
+            if let Some(entry) = shown(page.entries, index) {
+                if entry.positional {
+                    self.str(" ");
+                    self.str(entry.usage);
+                }
             }
             index += 1;
         }
@@ -1063,10 +1063,10 @@ impl Writer<'_> {
                     let mut seen = false;
                     let mut before = 0;
                     while before < index {
-                        if let Some(earlier) = shown(page.entries, before)
-                            && str_eq(title(earlier), heading)
-                        {
-                            seen = true;
+                        if let Some(earlier) = shown(page.entries, before) {
+                            if str_eq(title(earlier), heading) {
+                                seen = true;
+                            }
                         }
                         before += 1;
                     }

@@ -78,8 +78,8 @@ jobs:
       - name: Test without Features
         run: cargo test --workspace --no-default-features -- --exact --skip ui
 
-      - name: Test with all Features
-        run: cargo test --workspace --all-features -- --exact --skip ui
+      - name: Test with std
+        run: cargo test --workspace --no-default-features --features std -- --exact --skip ui
 
   package:
     runs-on: ubuntu-latest

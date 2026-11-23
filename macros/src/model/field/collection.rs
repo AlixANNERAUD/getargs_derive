@@ -153,8 +153,8 @@ pub(super) fn element<'t>(ty: &'t Type, errors: &mut Errors) -> Option<&'t Type>
         ));
         return None;
     }
-    if let Some(inner) = option_inner_type(ty)
-        && (collection_element(inner).is_some() || matches!(inner, Type::Array(_)))
+    if option_inner_type(ty)
+        .is_some_and(|inner| collection_element(inner).is_some() || matches!(inner, Type::Array(_)))
     {
         errors.push(syn::Error::new_spanned(
             ty,
@@ -233,13 +233,13 @@ pub(super) fn build(
         return None;
     }
 
-    if let Some((_, span)) = raw.num_args
-        && !matches!(kind, FieldKind::Positional)
-    {
-        errors.push(syn::Error::new(
-            span,
-            "`num_args` is only supported on positional arguments; a repeated option takes one value per occurrence",
-        ));
+    if !matches!(kind, FieldKind::Positional) {
+        if let Some((_, span)) = raw.num_args {
+            errors.push(syn::Error::new(
+                span,
+                "`num_args` is only supported on positional arguments; a repeated option takes one value per occurrence",
+            ));
+        }
     }
 
     let delimiter = raw.value_delimiter.map(|(delimiter, _)| delimiter);

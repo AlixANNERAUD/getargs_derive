@@ -199,7 +199,7 @@ Every guide page lists the compile-time diagnostics related to its topic.
 
 ## Minimum Supported Rust Version
 
-getargs-derive requires Rust 1.88 or newer, and is tested against it in CI.
+getargs-derive requires Rust 1.85 or newer, and is tested against it in CI. The `heapless` feature requires Rust 1.87 or newer, because that is what `heapless` 0.9 itself requires.
 
 ## License
 
