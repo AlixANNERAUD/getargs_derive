@@ -124,33 +124,33 @@ pub(super) fn check(
     value_enum: bool,
     errors: &mut Errors,
 ) {
-    if let FieldKind::Flag(_) = kind
-        && let Some(error) = key_error(value_parser, possible_values, |key| {
+    if let FieldKind::Flag(_) = kind {
+        if let Some(error) = key_error(value_parser, possible_values, |key| {
             format!("`{key}` cannot be used on flags because they do not take a value")
-        })
-    {
-        errors.push(error);
-        return;
+        }) {
+            errors.push(error);
+            return;
+        }
     }
 
-    if value_enum
-        && let Some(error) = key_error(value_parser, possible_values, |key| {
+    if value_enum {
+        if let Some(error) = key_error(value_parser, possible_values, |key| {
             format!(
                 "`{key}` cannot be combined with `value_enum`, which already defines the accepted values"
             )
-        })
-    {
-        errors.push(error);
-        return;
+        }) {
+            errors.push(error);
+            return;
+        }
     }
 
-    if let Some(ValueParser::Range(range)) = value_parser
-        && !is_count_type(value_ty)
-    {
-        errors.push(syn::Error::new_spanned(
-            range,
-            "a `value_parser` range requires an integer field type, e.g. `u8`; use a function for other types",
-        ));
+    if let Some(ValueParser::Range(range)) = value_parser {
+        if !is_count_type(value_ty) {
+            errors.push(syn::Error::new_spanned(
+                range,
+                "a `value_parser` range requires an integer field type, e.g. `u8`; use a function for other types",
+            ));
+        }
     }
 
     if let (Some(values), Some(DefaultValue::Literal(literal))) = (possible_values, default) {

@@ -80,16 +80,16 @@ fn variant_generics(generics: &Generics, fields: &Fields) -> Generics {
     }
     let mut output = Generics::default();
     for parameter in &generics.params {
-        if let GenericParam::Lifetime(lifetime) = parameter
-            && used.contains(&lifetime.lifetime.ident.to_string())
-        {
-            let mut lifetime = lifetime.clone();
-            lifetime.bounds = lifetime
-                .bounds
-                .into_iter()
-                .filter(|bound| used.contains(&bound.ident.to_string()))
-                .collect();
-            output.params.push(GenericParam::Lifetime(lifetime));
+        if let GenericParam::Lifetime(lifetime) = parameter {
+            if used.contains(&lifetime.lifetime.ident.to_string()) {
+                let mut lifetime = lifetime.clone();
+                lifetime.bounds = lifetime
+                    .bounds
+                    .into_iter()
+                    .filter(|bound| used.contains(&bound.ident.to_string()))
+                    .collect();
+                output.params.push(GenericParam::Lifetime(lifetime));
+            }
         }
     }
     output

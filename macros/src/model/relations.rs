@@ -115,17 +115,16 @@ pub(super) fn validate_relations(
             &names,
             errors,
         );
-        if let Some(literal) = relations.required_unless_present.first()
-            && !field.is_optional()
-            && !matches!(field.kind, FieldKind::Flag(_))
-        {
-            errors.push(syn::Error::new(
-                literal.span(),
-                format!(
-                    "`required_unless_present` requires an optional field; change the type of `{}` to `Option<T>` or give it a default",
-                    field.name
-                ),
-            ));
+        if !field.is_optional() && !matches!(field.kind, FieldKind::Flag(_)) {
+            if let Some(literal) = relations.required_unless_present.first() {
+                errors.push(syn::Error::new(
+                    literal.span(),
+                    format!(
+                        "`required_unless_present` requires an optional field; change the type of `{}` to `Option<T>` or give it a default",
+                        field.name
+                    ),
+                ));
+            }
         }
     }
 

@@ -292,9 +292,7 @@ fn build_subcommand(field: &Field, span: Span) -> syn::Result<SubcommandModel> {
     }
 
     let inner = option_inner_type(&field.ty);
-    if let Some(inner) = inner
-        && option_inner_type(inner).is_some()
-    {
+    if inner.is_some_and(|inner| option_inner_type(inner).is_some()) {
         errors.push(syn::Error::new_spanned(
             &field.ty,
             "`Option<Option<T>>` subcommand fields are not supported; use `Option<T>`",
@@ -382,17 +380,18 @@ fn build_field(field: &Field) -> syn::Result<FieldModel> {
         }
     }
 
-    if !named
-        && let Some(span) = raw
-            .short_aliases
-            .first()
-            .map(|alias| alias.span)
-            .or_else(|| raw.long_aliases.first().map(|alias| alias.span))
-    {
-        errors.push(syn::Error::new(
-            span,
-            "aliases require a named option; add `short` and/or `long`, e.g. `#[arg(long, alias = \"other\")]`",
-        ));
+    let alias_span = raw
+        .short_aliases
+        .first()
+        .map(|alias| alias.span)
+        .or_else(|| raw.long_aliases.first().map(|alias| alias.span));
+    if !named {
+        if let Some(span) = alias_span {
+            errors.push(syn::Error::new(
+                span,
+                "aliases require a named option; add `short` and/or `long`, e.g. `#[arg(long, alias = \"other\")]`",
+            ));
+        }
     }
 
     if is_bool && !named && raw.action.is_none() {
@@ -455,33 +454,28 @@ fn build_field(field: &Field) -> syn::Result<FieldModel> {
         None => (None, ident.span()),
     };
 
-    if let Some((_, span)) = &raw.value_name
-        && (is_bool || raw.action.is_some())
-        && named
-    {
-        errors.push(syn::Error::new(
-            *span,
-            "`value_name` cannot be used on flags because they do not take a value",
-        ));
+    if (is_bool || raw.action.is_some()) && named {
+        if let Some((_, span)) = &raw.value_name {
+            errors.push(syn::Error::new(
+                *span,
+                "`value_name` cannot be used on flags because they do not take a value",
+            ));
+        }
+        if let Some(span) = raw.value_enum {
+            errors.push(syn::Error::new(
+                span,
+                "`value_enum` cannot be used on flags because they do not take a value",
+            ));
+        }
     }
 
-    if let Some(span) = raw.value_enum
-        && (is_bool || raw.action.is_some())
-        && named
-    {
-        errors.push(syn::Error::new(
-            span,
-            "`value_enum` cannot be used on flags because they do not take a value",
-        ));
-    }
-
-    if let Some((_, span)) = &raw.display_order
-        && !named
-    {
-        errors.push(syn::Error::new(
-            *span,
-            "`display_order` cannot be used on positional arguments, which are listed in the order they are parsed",
-        ));
+    if !named {
+        if let Some((_, span)) = &raw.display_order {
+            errors.push(syn::Error::new(
+                *span,
+                "`display_order` cannot be used on positional arguments, which are listed in the order they are parsed",
+            ));
+        }
     }
 
     let kind = if !named {
