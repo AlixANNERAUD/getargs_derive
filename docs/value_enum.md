@@ -76,7 +76,7 @@ Nothing is allocated: every name is a `&'static str`, so the derive works in `no
 
 As in Clap, a field opts in with `#[arg(value_enum)]`, which works on positional arguments, named options and `Option<T>` fields:
 
-- The value is parsed with `ValueEnum::from_value`, and an unknown value is reported as [`Error::InvalidValue`](crate::Error::InvalidValue).
+- The value is parsed with `ValueEnum::from_value`, and an unknown value is reported as [`Error::InvalidPossibleValue`](crate::Error::InvalidPossibleValue), which carries `ValueEnum::POSSIBLE_VALUES`. Its message lists them as Clap does, `invalid value 'x' for '--mode <MODE>'` followed by a `[possible values: fast, slow-and-steady, turbo]` line, without allocation.
 - The generated help lists the possible values as `[possible values: a, b, c]`, after the default if there is one.
 - A `default_value_t` naming a variant, such as `Mode::SlowAndSteady`, is shown in the help as the variant's name (`[default: slow-and-steady]`). A `default_value` is shown as written, and parsed with `ValueEnum::from_value`.
 

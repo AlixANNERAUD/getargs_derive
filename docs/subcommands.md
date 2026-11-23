@@ -172,7 +172,7 @@ parents. The `HELP` and `LONG_HELP` constants of the top-level struct are the he
 
 | Variant                                          | Cause                                                                 | `Display`                                                         |
 | ------------------------------------------------ | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `MissingSubcommand(&'static [&'static str])`     | A required subcommand was not given. Lists the visible subcommands.   | `a subcommand is required but one was not provided`, followed by a `[subcommands: ...]` line |
+| `MissingSubcommand(&'static [&'static str])`     | A required subcommand was not given. Lists the visible subcommands.   | `a subcommand is required but one was not provided`, followed by a blank line and a `[subcommands: ...]` line |
 | `UnknownSubcommand { name, suggestion }`         | A positional argument is neither a subcommand nor accepted by a positional argument of the parent. | `unrecognized subcommand 'stats'`, followed by a `tip:` line when there is a suggestion |
 
 Errors of a subcommand's own arguments are the usual ones: `vcs push --bogus` is an `Error::UnknownOption`, and suggestions for unknown

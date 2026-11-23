@@ -53,8 +53,25 @@ fn merged_help(
     }
 }
 
+fn usage_item(container: &ContainerModel) -> TokenStream {
+    let start = usage_prefix(container, Mode::Short).len() - "Usage: ".len();
+    let help_flag = !container.disable_help_flag;
+    quote! {
+        /// The usage line of the struct, e.g. `Usage: copy [OPTIONS] <INPUT>`, and whether it has
+        /// a help flag, built at compile time from [`HELP`](Self::HELP).
+        ///
+        /// Pass it to [`Error::with_usage`](getargs_derive::Error::with_usage) to end an error
+        /// message with the usage and a hint to try `--help`.
+        pub const USAGE: getargs_derive::Usage = getargs_derive::Usage::new(
+            getargs_derive::__private::usage_line(Self::HELP, #start),
+        )
+        .help_flag(#help_flag);
+    }
+}
+
 pub(super) fn help_items(input: &DeriveInput, model: &Model) -> TokenStream {
     let container = &model.container;
+    let usage = usage_item(container);
     if model.subcommand.is_some() {
         let root = static_self(input);
         return quote! {
@@ -84,6 +101,8 @@ pub(super) fn help_items(input: &DeriveInput, model: &Model) -> TokenStream {
             /// before the subcommand. It is the same string as [`HELP`](Self::HELP) when no long
             /// help text is defined.
             pub const LONG_HELP: &'static str = Self::__HELPS[1];
+
+            #usage
         };
     }
     let (help, long_help) = if model.flattened.is_empty() {
@@ -114,6 +133,8 @@ pub(super) fn help_items(input: &DeriveInput, model: &Model) -> TokenStream {
         /// Returned in [`Error::Help`](getargs_derive::Error::Help) when `--help` is given. It is
         /// the same string as [`HELP`](Self::HELP) when no long help text is defined.
         pub const LONG_HELP: &'static str = #long_help;
+
+        #usage
     }
 }
 

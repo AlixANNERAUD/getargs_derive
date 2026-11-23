@@ -3,7 +3,7 @@
 `parse` and `from_args` return `Error<'a>`, where `'a` is the lifetime of the parsed arguments: errors describing what the user typed
 borrow the offending argument from the command line instead of copying it, so reporting them needs no allocation.
 Its `Display` implementation produces Clap-style messages, for example `unexpected argument '--bogus' found`.
-This is a Clap-inspired subset of Clap's error reporting: there are no error kinds, colours, usage reminders or exit codes.
+This is a Clap-inspired subset of Clap's error reporting: there are no error kinds, colours or exit codes, and the usage reminder is opt-in (see [Usage Hints](#usage-hints)).
 
 ```rust
 use getargs_derive::{Error, GetArgs, Opt};
@@ -43,14 +43,14 @@ assert_eq!(error.to_string(), "the following required argument was not provided:
 | `UnexpectedValue(Opt<'a>)`                            | A value was attached to a flag (`--verbose=yes`).                                                           | `unexpected value for '--verbose': it does not take a value`      |
 | `MissingOptionValue(&'static str)`                    | An option was given without its value (`--output` at the end of the arguments).                            | `a value is required for '--output <OUTPUT>' but none was supplied` |
 | `InvalidValue { name: &'static str, value: &'a str }` | A value or `default_value` could not be parsed into the field type (`abc` for a `u32`), or a `value_parser` function rejected it. | `invalid value 'abc' for '--port <PORT>'`                         |
-| `InvalidPossibleValue { name, value, possible_values }` | A value or `default_value` is not one of the `possible_values`. See [Value Validation][guide-validation]. | `invalid value 'turbo' for '--mode <MODE>'`, followed by a `[possible values: fast, slow]` line |
+| `InvalidPossibleValue { name, value, possible_values }` | A value or `default_value` is not one of the `possible_values`, or a `value_enum` field received a value that is none of the variants (`possible_values` is then `ValueEnum::POSSIBLE_VALUES`). See [Value Validation][guide-validation] and [Value Enums][guide-value-enum]. | `invalid value 'turbo' for '--mode <MODE>'`, followed by a `[possible values: fast, slow]` line |
 | `ValueOutOfRange { name, value, range }`              | A value or `default_value` is outside the `value_parser` range. `range` is written as in the attribute.   | `invalid value '0' for '--jobs <JOBS>': 0 is not in 1..=64`        |
 | `TooManyValues { name, value, max }`                  | A [repeated argument][guide-collections] received more values than its collection holds or its `num_args` accepts. `value` is the first value that did not fit. | `unexpected value 'd' for '--include <INCLUDE>' found; no more were expected` |
 | `TooFewValues { name, min, actual }`                  | A positional collection received fewer values than its `num_args` minimum, but at least one.               | `2 values required by '<PATHS>...'; only 1 was provided`          |
 | `ArgumentConflict { name, other }`                    | Two arguments that cannot be used together were given (`conflicts_with` or an exclusive group). See [Argument Relations][guide-relations]. | `the argument '--quiet' cannot be used with '--verbose'` |
 | `MissingRequiredArgument { name, required_by }`       | An argument was given without an argument it `requires`.                                                    | `the following required argument was not provided: --output <OUTPUT> (required by '--compress')` |
 | `MissingOneOf(&'static [&'static str])`               | None of a set of arguments was given (`required_unless_present` or a `required` group).                     | `the following required arguments were not provided: <--config <CONFIG>\|--stdin>` |
-| `MissingSubcommand(&'static [&'static str])`          | A required subcommand was not given. Lists the visible subcommands. See [Subcommands][guide-subcommands].   | `a subcommand is required but one was not provided`, followed by a `[subcommands: add, remove]` line |
+| `MissingSubcommand(&'static [&'static str])`          | A required subcommand was not given. Lists the visible subcommands. See [Subcommands][guide-subcommands].   | `a subcommand is required but one was not provided`, followed by a blank line and a `[subcommands: add, remove]` line |
 | `UnknownSubcommand { name: &'a str, suggestion }`     | A positional argument where a subcommand was expected is not a subcommand name or alias. `suggestion` is the closest visible name or alias, if any. | `unrecognized subcommand 'stats'`, followed by a `tip: a similar subcommand exists: 'status'` line when there is a suggestion |
 | `InvalidArguments`                                    | `getargs` reported an error kind this crate does not recognise (a future `getargs` release). Never returned with known `getargs` 0.5 releases. | `the arguments could not be parsed` |
 | `InvalidUtf8 { name: Option<&'static str>, value: &'a [u8] }` | With [raw byte arguments][guide-non-utf8], a value that is not valid UTF-8 was given to a field parsed from text. `name` is `None` for an argument that matches no field (an extra positional argument, an option or subcommand name). | `invalid UTF-8 in value 'caf\xE9' for '--name <NAME>'`, or `invalid UTF-8 in argument 'caf\xE9'` without a name |
@@ -89,6 +89,49 @@ when the version flag is enabled, using the edit distance with transpositions: a
 of the two names. Short options never get suggestions. After a subcommand, unknown long options are matched against the names of that
 subcommand, and unknown subcommands against the visible names and aliases of the subcommands.
 
+## Usage Hints
+
+Like Clap, an argument error can end with the usage line and a hint to try `--help`. The parser never prints anything, so this is opt-in:
+every struct deriving `GetArgs` has a `USAGE` constant, a [`Usage`](crate::Usage) built at compile time from its help, and
+[`Error::with_usage`](crate::Error::with_usage) pairs an error with it. The result implements `Display` (and `core::error::Error`),
+and nothing is allocated, so it works in `no_std`. `Error`'s own `Display` is unchanged.
+
+```rust
+use getargs_derive::{GetArgs, ValueEnum};
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum Format {
+    Mbr,
+    Linker,
+}
+
+#[derive(Debug, GetArgs)]
+#[command(name = "layout")]
+struct Cli {
+    #[arg(short, long, value_enum)]
+    format: Format,
+}
+
+let error = Cli::from_args(["--format", "bogus"].into_iter()).unwrap_err();
+assert_eq!(
+    error.with_usage(Cli::USAGE).to_string(),
+    "\
+invalid value 'bogus' for '--format <FORMAT>'
+  [possible values: mbr, linker]
+
+Usage: layout [OPTIONS]
+
+For more information, try '--help'."
+);
+```
+
+- `Cli::USAGE.line` is the usage line of `Cli::HELP`, such as `Usage: layout [OPTIONS] <INPUT>`; `Cli::USAGE.to_string()` is the same line.
+- The hint `For more information, try '--help'.` is left out when the struct has `#[command(disable_help_flag)]`.
+- [`Error::Help`](crate::Error::Help) and [`Error::Version`](crate::Error::Version) are written alone: they are not failures.
+- For an error raised by a subcommand, `Cli::USAGE` is the usage of the struct holding the subcommand, not of the subcommand itself. Its own usage line is the first
+  line starting with `Usage: ` of its help, returned by `-h`.
+- A [`Usage`](crate::Usage) can also be built by hand with `Usage::new`, for an application that formats errors differently.
+
 Because errors borrow from the arguments, they must be handled while the arguments are alive. When the arguments are string literals the error is `Error<'static>`
 and can be returned from `main`; with `std::env::args()`, collect the arguments first and report the error before they are dropped,
 as shown in [Generated Help][guide-help].
@@ -100,4 +143,5 @@ as shown in [Generated Help][guide-help].
 [guide-relations]: relations.md
 [guide-subcommands]: subcommands.md
 [guide-validation]: validation.md
+[guide-value-enum]: value_enum.md
 [guide-version]: version.md
