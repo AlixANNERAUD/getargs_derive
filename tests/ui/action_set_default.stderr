@@ -1,0 +1,5 @@
+error: `default_value` "yes" is not one of the possible values: true, false
+ --> tests/ui/action_set_default.rs:5:47
+  |
+5 |     #[arg(long, action = Set, default_value = "yes")]
+  |                                               ^^^^^

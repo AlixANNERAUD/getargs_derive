@@ -9,6 +9,7 @@ mod help;
 mod names;
 mod parsing;
 mod relations;
+mod skip;
 mod validation;
 mod value_enum;
 
@@ -16,6 +17,7 @@ use super::attr::{Key, dispatch};
 use super::doc::{long_doc, short_doc};
 use super::errors::Errors;
 use super::types::{ValueKind, is_bool_type, is_count_type, option_inner_type, value_kind};
+use action::Action;
 pub(crate) use action::FlagAction;
 pub(crate) use aliases::Alias;
 pub(crate) use collection::CollectionModel;
@@ -58,6 +60,7 @@ const ARG_KEYS: &[Key<RawField>] = &[
     Key::new("short", names::short),
     Key::new("short_alias", aliases::short_alias),
     Key::new("short_aliases", aliases::short_aliases),
+    Key::new("skip", skip::skip),
     Key::new("value_delimiter", collection::value_delimiter),
     Key::new("value_enum", value_enum::value_enum),
     Key::new("value_name", help::value_name),
@@ -75,6 +78,12 @@ pub(crate) struct FlattenModel {
     pub(crate) span: Span,
 }
 
+pub(crate) struct SkipModel {
+    pub(crate) ident: Ident,
+    pub(crate) value: Option<Expr>,
+    pub(crate) span: Span,
+}
+
 pub(crate) struct SubcommandModel {
     pub(crate) ident: Ident,
     pub(crate) name: String,
@@ -87,6 +96,7 @@ pub(crate) enum Member {
     Arg(Box<FieldModel>),
     Flatten(Box<FlattenModel>),
     Subcommand(Box<SubcommandModel>),
+    Skip(Box<SkipModel>),
 }
 
 pub(crate) enum FieldKind {
@@ -179,7 +189,7 @@ struct RawField {
     default: Option<(DefaultSource, DefaultValue)>,
     help: Option<String>,
     value_name: Option<(String, Span)>,
-    action: Option<(FlagAction, syn::Path)>,
+    action: Option<(action::Action, syn::Path)>,
     relations: Relations,
     short_aliases: Vec<Alias<char>>,
     long_aliases: Vec<Alias<String>>,
@@ -193,6 +203,8 @@ struct RawField {
     long_help: Option<String>,
     parsing: parsing::RawParsing,
     collection: collection::RawCollection,
+    skip: Option<(Option<Expr>, Span)>,
+    first_key: Option<Span>,
 }
 
 fn to_kebab_case(name: &str) -> String {
@@ -212,9 +224,13 @@ fn parse_raw_field(field: &Field) -> syn::Result<RawField> {
                 ));
                 continue;
             }
-            if let Err(error) =
-                attr.parse_nested_meta(|meta| dispatch(meta, "arg", ARG_KEYS, &mut raw))
-            {
+            let result = attr.parse_nested_meta(|meta| {
+                if !meta.path.is_ident("skip") && raw.first_key.is_none() {
+                    raw.first_key = Some(meta.path.span());
+                }
+                dispatch(meta, "arg", ARG_KEYS, &mut raw)
+            });
+            if let Err(error) = result {
                 errors.push(error);
             }
         }
@@ -269,7 +285,50 @@ pub(super) fn build_member(field: &Field) -> syn::Result<Member> {
         (None, Some(span)) => {
             build_subcommand(field, span).map(|model| Member::Subcommand(Box::new(model)))
         }
-        (None, None) => build_field(field).map(|model| Member::Arg(Box::new(model))),
+        (None, None) => {
+            let raw = parse_raw_field(field)?;
+            match raw.skip {
+                Some((value, span)) => build_skip(field, value, span, raw.first_key)
+                    .map(|model| Member::Skip(Box::new(model))),
+                None => build_field(field, raw).map(|model| Member::Arg(Box::new(model))),
+            }
+        }
+    }
+}
+
+fn build_skip(
+    field: &Field,
+    value: Option<Expr>,
+    span: Span,
+    other_key: Option<Span>,
+) -> syn::Result<SkipModel> {
+    let Some(ident) = field.ident.clone() else {
+        return Err(syn::Error::new_spanned(
+            field,
+            "GetArgs requires a struct with named fields",
+        ));
+    };
+    if other_key.is_some() {
+        return Err(syn::Error::new(
+            span,
+            "`skip` cannot be combined with other `#[arg(...)]` attributes, because a skipped field is not an argument",
+        ));
+    }
+    Ok(SkipModel { ident, value, span })
+}
+
+fn reject_arg(attr: &syn::Attribute, command: &str, target: &str) -> syn::Error {
+    match skip::find_skip(attr) {
+        Some(span) => syn::Error::new(
+            span,
+            format!("`skip` cannot be combined with `#[command({command})]`; remove one of them"),
+        ),
+        None => syn::Error::new_spanned(
+            attr,
+            format!(
+                "`#[arg(...)]` cannot be combined with `#[command({command})]`; put the attributes on the fields of {target}"
+            ),
+        ),
     }
 }
 
@@ -284,10 +343,7 @@ fn build_subcommand(field: &Field, span: Span) -> syn::Result<SubcommandModel> {
 
     for attr in &field.attrs {
         if attr.path().is_ident("arg") {
-            errors.push(syn::Error::new_spanned(
-                attr,
-                "`#[arg(...)]` cannot be combined with `#[command(subcommand)]`; put the attributes on the fields of the subcommand variants",
-            ));
+            errors.push(reject_arg(attr, "subcommand", "the subcommand variants"));
         }
     }
 
@@ -326,10 +382,7 @@ fn build_flatten(field: &Field, span: Span) -> syn::Result<FlattenModel> {
 
     for attr in &field.attrs {
         if attr.path().is_ident("arg") {
-            errors.push(syn::Error::new_spanned(
-                attr,
-                "`#[arg(...)]` cannot be combined with `#[command(flatten)]`; put the attributes on the fields of the flattened struct",
-            ));
+            errors.push(reject_arg(attr, "flatten", "the flattened struct"));
         }
     }
 
@@ -341,14 +394,13 @@ fn build_flatten(field: &Field, span: Span) -> syn::Result<FlattenModel> {
     })
 }
 
-fn build_field(field: &Field) -> syn::Result<FieldModel> {
+fn build_field(field: &Field, mut raw: RawField) -> syn::Result<FieldModel> {
     let Some(ident) = field.ident.clone() else {
         return Err(syn::Error::new_spanned(
             field,
             "GetArgs requires a struct with named fields",
         ));
     };
-    let raw = parse_raw_field(field)?;
     let name = ident.unraw().to_string();
     let mut errors = Errors::default();
     let element = collection::element(&field.ty, &mut errors);
@@ -412,13 +464,13 @@ fn build_field(field: &Field) -> syn::Result<FieldModel> {
             ));
         }
         match action {
-            FlagAction::SetTrue | FlagAction::SetFalse if !is_bool => {
+            Action::Flag(FlagAction::SetTrue | FlagAction::SetFalse) | Action::Set if !is_bool => {
                 errors.push(syn::Error::new_spanned(
                     path,
                     format!("`action = {name}` can only be used on `bool` fields"),
                 ));
             }
-            FlagAction::Count if !is_count_type(&field.ty) => {
+            Action::Flag(FlagAction::Count) if !is_count_type(&field.ty) => {
                 errors.push(syn::Error::new_spanned(
                     path,
                     "`action = Count` requires an integer field type, e.g. `u8`",
@@ -454,7 +506,13 @@ fn build_field(field: &Field) -> syn::Result<FieldModel> {
         None => (None, ident.span()),
     };
 
-    if (is_bool || raw.action.is_some()) && named {
+    let flag = match &raw.action {
+        Some((Action::Flag(action), _)) => Some(*action),
+        Some((Action::Set, _)) => None,
+        None => is_bool.then_some(FlagAction::SetTrue),
+    };
+
+    if flag.is_some() && named {
         if let Some((_, span)) = &raw.value_name {
             errors.push(syn::Error::new(
                 *span,
@@ -478,15 +536,21 @@ fn build_field(field: &Field) -> syn::Result<FieldModel> {
         }
     }
 
-    let kind = if !named {
-        FieldKind::Positional
-    } else if let Some((action, _)) = &raw.action {
-        FieldKind::Flag(*action)
-    } else if is_bool {
-        FieldKind::Flag(FlagAction::SetTrue)
-    } else {
-        FieldKind::Option
+    let kind = match (named, flag) {
+        (false, _) => FieldKind::Positional,
+        (true, Some(action)) => FieldKind::Flag(action),
+        (true, None) => FieldKind::Option,
     };
+
+    if let Some((Action::Set, path)) = &raw.action {
+        if is_bool
+            && raw.value_parser.is_none()
+            && raw.possible_values.is_none()
+            && raw.value_enum.is_none()
+        {
+            raw.possible_values = Some(PossibleValues::booleans(path.span()));
+        }
+    }
     let parsing = parsing::build_parsing(raw.parsing, &kind, &mut errors);
 
     let env = raw.env.map(|(value, span)| {

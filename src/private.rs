@@ -67,6 +67,43 @@ impl HelpEntry {
     }
 }
 
+/// The error of a `value_parser` function, turned into an [`Error`] with
+/// `(&ParserError(error)).__invalid_value(name, value)`.
+///
+/// The call resolves to [`KeepReason`] when the error is a `&str`, and to [`DropReason`] for any
+/// other type: method lookup tries the receiver `&ParserError<E>` before borrowing it again, and
+/// only `KeepReason` is implemented on `ParserError` itself. The macro cannot tell the error type
+/// apart, since it only sees the path of the function.
+pub struct ParserError<E>(pub E);
+
+/// Keeps a `&str` error of a `value_parser` function as the reason of the error.
+pub trait KeepReason<'a> {
+    /// The error reported for `value`, rejected by the function.
+    fn __invalid_value(&self, name: &'static str, value: &'a str) -> Error<'a>;
+}
+
+impl<'a> KeepReason<'a> for ParserError<&'a str> {
+    fn __invalid_value(&self, name: &'static str, value: &'a str) -> Error<'a> {
+        Error::InvalidValueReason {
+            name,
+            value,
+            reason: self.0,
+        }
+    }
+}
+
+/// Discards an error of a `value_parser` function that `Error` cannot hold without allocating.
+pub trait DropReason {
+    /// The error reported for `value`, rejected by the function.
+    fn __invalid_value<'a>(&self, name: &'static str, value: &'a str) -> Error<'a>;
+}
+
+impl<E> DropReason for &ParserError<E> {
+    fn __invalid_value<'a>(&self, name: &'static str, value: &'a str) -> Error<'a> {
+        Error::InvalidValue { name, value }
+    }
+}
+
 /// Parsing state shared by a struct with the structs it flattens and its subcommands.
 #[derive(Debug, Clone, Copy)]
 pub struct Context<'a, 'r> {

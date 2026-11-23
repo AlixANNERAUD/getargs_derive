@@ -93,6 +93,17 @@ fn parse_possible_values(meta: &ParseNestedMeta) -> syn::Result<PossibleValues> 
     })
 }
 
+impl PossibleValues {
+    /// The values `bool::from_str` accepts, listed in the help and checked before parsing as
+    /// Clap does for a boolean option.
+    pub(super) fn booleans(span: Span) -> Self {
+        PossibleValues {
+            values: vec!["true".to_owned(), "false".to_owned()],
+            span,
+        }
+    }
+}
+
 pub(super) fn possible_values(meta: &ParseNestedMeta, raw: &mut RawField) -> syn::Result<()> {
     let values = parse_possible_values(meta)?;
     set_once(&mut raw.possible_values, values, meta)

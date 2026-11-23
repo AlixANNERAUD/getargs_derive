@@ -2,10 +2,10 @@ use super::env::env_lookup;
 use super::parsing;
 use super::validation::convert;
 use crate::model::{
-    DefaultValue, FieldKind, FieldModel, FlagAction, FlattenModel, Slot, SubcommandModel,
+    DefaultValue, FieldKind, FieldModel, FlagAction, FlattenModel, SkipModel, Slot, SubcommandModel,
 };
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, quote_spanned};
 use syn::{Ident, Index, Type};
 
 #[derive(Default)]
@@ -124,6 +124,16 @@ impl FieldTokens {
             self.global_arms.push(arm.clone());
         }
         self.option_match_arms.push(arm);
+    }
+
+    pub(super) fn push_skip(&mut self, skip: &SkipModel) {
+        let ident = &skip.ident;
+        let span = skip.span;
+        // Spanned on `skip` so that a missing `Default` or `Into` impl points at the attribute.
+        self.field_builds.push(match &skip.value {
+            Some(value) => quote_spanned! { span=> #ident: core::convert::Into::into(#value) },
+            None => quote_spanned! { span=> #ident: core::default::Default::default() },
+        });
     }
 
     pub(super) fn push_subcommand(&mut self, subcommand: &SubcommandModel) {

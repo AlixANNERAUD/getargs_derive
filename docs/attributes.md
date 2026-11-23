@@ -30,6 +30,9 @@ All field attributes live in `#[arg(...)]`. Entries can be combined in one attri
 | `#[arg(action = Count)]`          | Flag counting its occurrences on an integer field. See [Flag Actions][guide-actions].                   |
 | `#[arg(action = SetFalse)]`       | Flag on a `bool` field that defaults to `true` and is set to `false` by its presence.                   |
 | `#[arg(action = SetTrue)]`        | Explicit form of the default `bool` flag behaviour.                                                     |
+| `#[arg(action = Set)]`            | Option on a `bool` field taking `true` or `false` as its value. See [Flag Actions][guide-actions].     |
+| `#[arg(skip)]`                    | Not an argument: the field is set to `Default::default()`. See [Skipped Fields](#skipped-fields).       |
+| `#[arg(skip = expr)]`             | Not an argument: the field is set to `expr`, converted with `Into`. See [Skipped Fields](#skipped-fields). |
 
 `short` and `long` can be combined: `#[arg(short, long)]` accepts both `-v` and `--verbose`.
 
@@ -41,19 +44,20 @@ option or a flag also accepted after the subcommands; see [Subcommands][guide-su
 
 - A field is a **named option** if and only if it has `short` and/or `long`. It is only reachable through the names it declares: a field with `#[arg(short)]` has no long name, and vice versa.
 - A named `bool` field is a **flag**: its presence sets it to `true`, and it defaults to `false`. It never consumes a value.
-- A named field with an `action` is a **flag** behaving as described in [Flag Actions][guide-actions].
+- A named field with an `action` is a **flag** behaving as described in [Flag Actions][guide-actions], except with `action = Set`, which makes a `bool` field an option taking `true` or `false`.
 - A named field of any other type is an **option** taking a value (`-j 4`, `-j4`, `--jobs 4` or `--jobs=4`). A separate value starting with `-` is refused unless the option allows it; see [Parsing Modes][guide-parsing].
 - Every other field is a **positional argument**, filled in declaration order. `bool` fields cannot be positional.
 - A field of type `Option<T>` is **optional**: it is `None` when absent, and `Some(value)` otherwise, with the value parsed as for a `T` field. See [Positional and Optional Arguments][guide-positionals].
+- A field with `skip` is **not an argument** at all; see [Skipped Fields](#skipped-fields).
 
 ## Supported Field Types
 
 | Type                      | Positional | Named option | Notes                                                                       |
 | ------------------------- | ---------- | ------------ | --------------------------------------------------------------------------- |
-| `&str`                    | ✓          | ✓            | Borrows the argument string directly — no allocation.                       |
+| `&str`                    | ✓          | ✓            | Borrows the argument string directly, with no allocation.                   |
 | `&[u8]`                   | ✓          | ✓            | Borrows the raw bytes of the argument, which need not be valid UTF-8. See [Non-UTF-8 Arguments][guide-non-utf8]. |
 | `&OsStr`, `&Path`, `OsString`, `PathBuf` | ✓ | ✓          | With the `std` feature, converted without a UTF-8 check on Unix. `OsString` and `PathBuf` use `FromStr` without it. |
-| `bool`                    | ✗          | ✓            | Flag, set to `true` by its presence (`false` with `action = SetFalse`).     |
+| `bool`                    | ✗          | ✓            | Flag, set to `true` by its presence (`false` with `action = SetFalse`), or an option taking `true` or `false` with `action = Set`. |
 | Integer with `action = Count` | ✗      | ✓            | Flag counting its occurrences.                                              |
 | `NonZeroU*` / `NonZeroI*` | ✓          | ✓            | Parsed via `.parse()`. Required unless a default is given.                  |
 | Any `FromStr` type        | ✓          | ✓            | Parsed via `.parse()`. Required unless a default is given.                  |
@@ -62,6 +66,39 @@ option or a flag also accepted after the subcommands; see [Subcommands][guide-su
 | `Values<T, N>`            | ✓          | ✓            | Repeated values, at most `N`, without allocation. See [Repeated Values][guide-collections]. |
 | `heapless::Vec<T, N>`     | ✓          | ✓            | Same, with the `heapless` feature.                                          |
 | `Vec<T>`                  | ✓          | ✓            | Repeated values without limit, with the `alloc` feature.                    |
+
+## Skipped Fields
+
+As in Clap, `#[arg(skip)]` keeps a field out of the command line: it is never parsed, and it is left out of the help, the
+[completions and man pages][guide-completions], name checks, relations and suggestions. The field is set to `Default::default()`,
+or with `#[arg(skip = expr)]` to `expr` converted with `Into::into`, as Clap does, so `skip = "text"` fills a `String`.
+An integer literal converted with `Into` may need a suffix, e.g. `skip = 10u32`, when several integer types convert into the field type.
+The field type does not need `FromStr`, and skipped fields work the same in flattened structs and in the variants of a subcommand enum.
+
+```rust
+use getargs_derive::GetArgs;
+
+#[derive(Default)]
+struct Cache {
+    entries: Vec<String>,
+}
+
+#[derive(GetArgs)]
+struct Cli<'a> {
+    input: &'a str,
+    #[arg(skip)]
+    cache: Cache,
+    #[arg(skip = 3)]
+    retries: u8,
+}
+
+let cli = Cli::from_args(["in.txt"].into_iter()).unwrap();
+assert!(cli.cache.entries.is_empty());
+assert_eq!(cli.retries, 3);
+assert!(Cli::from_args(["in.txt", "--retries", "5"].into_iter()).is_err());
+```
+
+`skip` cannot be combined with any other `#[arg(...)]` key, nor with `#[command(flatten)]` or `#[command(subcommand)]`.
 
 ## Container Attributes
 
@@ -128,10 +165,12 @@ The macro reports a compile error, pointing at the offending attribute or field,
 - `long` values that are not a string literal, are empty, start with `-`, or contain whitespace or `=`;
 - two fields using the same short or long name;
 - unknown or repeated `#[command(...)]` keys, and `value_name` on a flag;
+- `skip` combined with another `#[arg(...)]` key, with `#[command(flatten)]` or with `#[command(subcommand)]`, and `skip` with a value in parentheses;
 - enums, unions, tuple structs and unit structs.
 
 [guide-actions]: actions.md
 [guide-collections]: collections.md
+[guide-completions]: completions.md
 [guide-defaults]: defaults.md
 [guide-env]: env.md
 [guide-flatten]: flatten.md

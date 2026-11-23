@@ -175,7 +175,7 @@ Unsupported Clap attributes are rejected at compile time rather than silently ig
 ## Guide
 
 - [Attribute Reference][guide-attributes]: `#[arg(...)]` and `#[command(...)]` attributes, argument resolution and supported field types.
-- [Flag Actions][guide-actions]: `SetTrue`, `SetFalse` and `Count` flags.
+- [Flag Actions][guide-actions]: `SetTrue`, `SetFalse` and `Count` flags, and `Set` booleans taking a value.
 - [Argument Aliases][guide-aliases]: hidden and visible long and short aliases.
 - [Value Enums][guide-value-enum]: `#[derive(ValueEnum)]` and `#[arg(value_enum)]` for arguments accepting a fixed set of values.
 - [Default Values][guide-defaults]: `default_value` and `default_value_t`.

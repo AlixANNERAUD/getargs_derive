@@ -110,12 +110,26 @@ pub enum Error<'a> {
 
     /// A value could not be parsed into the target field type, e.g. `abc` for a `u32` field.
     ///
-    /// This is also returned when a `default_value` string does not parse.
+    /// This is also returned when a `default_value` string does not parse, and when a
+    /// `value_parser` function rejects a value with an error that is not a `&str`.
     InvalidValue {
         /// The argument name, e.g. `"--port <PORT>"` or `"<COUNT>"`.
         name: &'static str,
         /// The value that failed to parse.
         value: &'a str,
+    },
+
+    /// A `value_parser` function rejected a value with a `&str` error, kept as the reason.
+    ///
+    /// This is also returned when the function rejects a `default_value` string or the value of
+    /// an environment variable.
+    InvalidValueReason {
+        /// The argument name, e.g. `"--port <PORT>"`.
+        name: &'static str,
+        /// The value that was rejected.
+        value: &'a str,
+        /// The error returned by the function, e.g. `"must be at least 1024"`.
+        reason: &'a str,
     },
 
     /// A value is not one of the argument's `possible_values`, e.g. `turbo` for
@@ -315,6 +329,13 @@ impl core::fmt::Display for Error<'_> {
             }
             Error::InvalidValue { name, value } => {
                 write!(f, "invalid value '{value}' for '{name}'")
+            }
+            Error::InvalidValueReason {
+                name,
+                value,
+                reason,
+            } => {
+                write!(f, "invalid value '{value}' for '{name}': {reason}")
             }
             Error::InvalidPossibleValue {
                 name,

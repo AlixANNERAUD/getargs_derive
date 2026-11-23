@@ -63,8 +63,38 @@ Options:
 ## Parser Functions
 
 `value_parser = path` takes the path of a function, or of anything callable as `path(value)`, with the signature
-`fn(&str) -> Result<T, E>`, where `T` is the field type (the inner type for `Option<T>`). The error type `E` is free: its value is discarded,
-because the crate does not allocate and `Error` cannot carry it, and the failure is reported as `Error::InvalidValue`.
+`fn(&str) -> Result<T, E>`, where `T` is the field type (the inner type for `Option<T>`). The error type `E` is free.
+When it is `&str`, a `&'static str` such as a string literal or a slice of the value, the error is kept as the reason and the failure is reported as `Error::InvalidValueReason`,
+displayed like Clap's `invalid value '80' for '--port <PORT>': must be at least 1024`.
+Any other error is discarded, because the crate does not allocate and `Error` cannot carry it, and the failure is reported as `Error::InvalidValue`.
+The macro picks between the two from the type of the function, so the function needs no other change.
+
+```rust
+use getargs_derive::{Error, GetArgs};
+
+fn unprivileged(value: &str) -> Result<u16, &'static str> {
+    match value.parse() {
+        Ok(port) if port >= 1024 => Ok(port),
+        Ok(_) => Err("must be at least 1024"),
+        Err(_) => Err("not a port number"),
+    }
+}
+
+#[derive(Debug, GetArgs)]
+struct Cli {
+    #[arg(short, long, value_parser = unprivileged, default_value_t = 8080)]
+    port: u16,
+}
+
+let error = Cli::from_args(["--port", "80"].into_iter()).unwrap_err();
+assert_eq!(
+    error,
+    Error::InvalidValueReason { name: "--port <PORT>", value: "80", reason: "must be at least 1024" }
+);
+assert_eq!(error.to_string(), "invalid value '80' for '--port <PORT>': must be at least 1024");
+```
+
+Only `&str` itself is recognised: an error type wrapping a string, such as `String`, `Box<str>` or `&&str`, is discarded.
 Unlike `FromStr`, the function may borrow from the argument, so a `&'a str` field can be validated or trimmed without copying:
 
 ```rust

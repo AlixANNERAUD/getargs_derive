@@ -1,0 +1,29 @@
+error: `skip` cannot be combined with other `#[arg(...)]` attributes, because a skipped field is not an argument
+ --> tests/ui/skip_attributes.rs:5:17
+  |
+5 |     #[arg(long, skip)]
+  |                 ^^^^
+
+error: `skip` cannot be combined with other `#[arg(...)]` attributes, because a skipped field is not an argument
+ --> tests/ui/skip_attributes.rs:7:11
+  |
+7 |     #[arg(skip = 4)]
+  |           ^^^^
+
+error: `skip` expects no value or an expression, e.g. `skip` or `skip = 4`
+  --> tests/ui/skip_attributes.rs:10:11
+   |
+10 |     #[arg(skip(4))]
+   |           ^^^^
+
+error: duplicate `skip` attribute
+  --> tests/ui/skip_attributes.rs:12:17
+   |
+12 |     #[arg(skip, skip = 1)]
+   |                 ^^^^^^^^
+
+error: `skip` cannot be combined with other `#[arg(...)]` attributes, because a skipped field is not an argument
+  --> tests/ui/skip_attributes.rs:19:22
+   |
+19 |         #[arg(short, skip)]
+   |                      ^^^^

@@ -1,0 +1,5 @@
+error: `action = Set` requires a named option; add `short` and/or `long`, e.g. `#[arg(short, long, action = Set)]`
+ --> tests/ui/action_set_positional.rs:5:20
+  |
+5 |     #[arg(action = Set)]
+  |                    ^^^
