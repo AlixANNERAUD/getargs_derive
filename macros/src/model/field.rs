@@ -17,6 +17,7 @@ use super::attr::{Key, dispatch};
 use super::doc::{long_doc, short_doc};
 use super::errors::Errors;
 use super::types::{ValueKind, is_bool_type, is_count_type, option_inner_type, value_kind};
+use action::Action;
 pub(crate) use action::FlagAction;
 pub(crate) use aliases::Alias;
 pub(crate) use collection::CollectionModel;
@@ -188,7 +189,7 @@ struct RawField {
     default: Option<(DefaultSource, DefaultValue)>,
     help: Option<String>,
     value_name: Option<(String, Span)>,
-    action: Option<(FlagAction, syn::Path)>,
+    action: Option<(action::Action, syn::Path)>,
     relations: Relations,
     short_aliases: Vec<Alias<char>>,
     long_aliases: Vec<Alias<String>>,
@@ -393,7 +394,7 @@ fn build_flatten(field: &Field, span: Span) -> syn::Result<FlattenModel> {
     })
 }
 
-fn build_field(field: &Field, raw: RawField) -> syn::Result<FieldModel> {
+fn build_field(field: &Field, mut raw: RawField) -> syn::Result<FieldModel> {
     let Some(ident) = field.ident.clone() else {
         return Err(syn::Error::new_spanned(
             field,
@@ -463,13 +464,13 @@ fn build_field(field: &Field, raw: RawField) -> syn::Result<FieldModel> {
             ));
         }
         match action {
-            FlagAction::SetTrue | FlagAction::SetFalse if !is_bool => {
+            Action::Flag(FlagAction::SetTrue | FlagAction::SetFalse) | Action::Set if !is_bool => {
                 errors.push(syn::Error::new_spanned(
                     path,
                     format!("`action = {name}` can only be used on `bool` fields"),
                 ));
             }
-            FlagAction::Count if !is_count_type(&field.ty) => {
+            Action::Flag(FlagAction::Count) if !is_count_type(&field.ty) => {
                 errors.push(syn::Error::new_spanned(
                     path,
                     "`action = Count` requires an integer field type, e.g. `u8`",
@@ -505,7 +506,13 @@ fn build_field(field: &Field, raw: RawField) -> syn::Result<FieldModel> {
         None => (None, ident.span()),
     };
 
-    if (is_bool || raw.action.is_some()) && named {
+    let flag = match &raw.action {
+        Some((Action::Flag(action), _)) => Some(*action),
+        Some((Action::Set, _)) => None,
+        None => is_bool.then_some(FlagAction::SetTrue),
+    };
+
+    if flag.is_some() && named {
         if let Some((_, span)) = &raw.value_name {
             errors.push(syn::Error::new(
                 *span,
@@ -529,15 +536,21 @@ fn build_field(field: &Field, raw: RawField) -> syn::Result<FieldModel> {
         }
     }
 
-    let kind = if !named {
-        FieldKind::Positional
-    } else if let Some((action, _)) = &raw.action {
-        FieldKind::Flag(*action)
-    } else if is_bool {
-        FieldKind::Flag(FlagAction::SetTrue)
-    } else {
-        FieldKind::Option
+    let kind = match (named, flag) {
+        (false, _) => FieldKind::Positional,
+        (true, Some(action)) => FieldKind::Flag(action),
+        (true, None) => FieldKind::Option,
     };
+
+    if let Some((Action::Set, path)) = &raw.action {
+        if is_bool
+            && raw.value_parser.is_none()
+            && raw.possible_values.is_none()
+            && raw.value_enum.is_none()
+        {
+            raw.possible_values = Some(PossibleValues::booleans(path.span()));
+        }
+    }
     let parsing = parsing::build_parsing(raw.parsing, &kind, &mut errors);
 
     let env = raw.env.map(|(value, span)| {

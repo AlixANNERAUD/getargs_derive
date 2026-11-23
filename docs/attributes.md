@@ -30,6 +30,7 @@ All field attributes live in `#[arg(...)]`. Entries can be combined in one attri
 | `#[arg(action = Count)]`          | Flag counting its occurrences on an integer field. See [Flag Actions][guide-actions].                   |
 | `#[arg(action = SetFalse)]`       | Flag on a `bool` field that defaults to `true` and is set to `false` by its presence.                   |
 | `#[arg(action = SetTrue)]`        | Explicit form of the default `bool` flag behaviour.                                                     |
+| `#[arg(action = Set)]`            | Option on a `bool` field taking `true` or `false` as its value. See [Flag Actions][guide-actions].     |
 | `#[arg(skip)]`                    | Not an argument: the field is set to `Default::default()`. See [Skipped Fields](#skipped-fields).       |
 | `#[arg(skip = expr)]`             | Not an argument: the field is set to `expr`, converted with `Into`. See [Skipped Fields](#skipped-fields). |
 
@@ -43,7 +44,7 @@ option or a flag also accepted after the subcommands; see [Subcommands][guide-su
 
 - A field is a **named option** if and only if it has `short` and/or `long`. It is only reachable through the names it declares: a field with `#[arg(short)]` has no long name, and vice versa.
 - A named `bool` field is a **flag**: its presence sets it to `true`, and it defaults to `false`. It never consumes a value.
-- A named field with an `action` is a **flag** behaving as described in [Flag Actions][guide-actions].
+- A named field with an `action` is a **flag** behaving as described in [Flag Actions][guide-actions], except with `action = Set`, which makes a `bool` field an option taking `true` or `false`.
 - A named field of any other type is an **option** taking a value (`-j 4`, `-j4`, `--jobs 4` or `--jobs=4`). A separate value starting with `-` is refused unless the option allows it; see [Parsing Modes][guide-parsing].
 - Every other field is a **positional argument**, filled in declaration order. `bool` fields cannot be positional.
 - A field of type `Option<T>` is **optional**: it is `None` when absent, and `Some(value)` otherwise, with the value parsed as for a `T` field. See [Positional and Optional Arguments][guide-positionals].
@@ -56,7 +57,7 @@ option or a flag also accepted after the subcommands; see [Subcommands][guide-su
 | `&str`                    | ✓          | ✓            | Borrows the argument string directly, with no allocation.                   |
 | `&[u8]`                   | ✓          | ✓            | Borrows the raw bytes of the argument, which need not be valid UTF-8. See [Non-UTF-8 Arguments][guide-non-utf8]. |
 | `&OsStr`, `&Path`, `OsString`, `PathBuf` | ✓ | ✓          | With the `std` feature, converted without a UTF-8 check on Unix. `OsString` and `PathBuf` use `FromStr` without it. |
-| `bool`                    | ✗          | ✓            | Flag, set to `true` by its presence (`false` with `action = SetFalse`).     |
+| `bool`                    | ✗          | ✓            | Flag, set to `true` by its presence (`false` with `action = SetFalse`), or an option taking `true` or `false` with `action = Set`. |
 | Integer with `action = Count` | ✗      | ✓            | Flag counting its occurrences.                                              |
 | `NonZeroU*` / `NonZeroI*` | ✓          | ✓            | Parsed via `.parse()`. Required unless a default is given.                  |
 | Any `FromStr` type        | ✓          | ✓            | Parsed via `.parse()`. Required unless a default is given.                  |

@@ -33,7 +33,9 @@ An `Option<T>` field is `None` only when it is absent from both the command line
 The variable is only read when the argument is absent from the command line, and its value is used as-is for `&str` fields, parsed with `ValueEnum::from_value` for `value_enum` fields, and otherwise parsed with `FromStr`, with the same [value validation][guide-validation] as command-line values.
 If it does not parse, `parse` returns `Error::InvalidValue` with the argument name followed by the variable, e.g. `"--port <PORT> [env: SERVER_PORT]"`.
 
-`env` is not supported on flags. This is a Clap-inspired subset: Clap's `hide_env`, `hide_env_values` and boolean parsing of environment values for flags are not supported.
+`env` is not supported on flags. A `bool` field reading an environment variable can be an option taking a value with
+[`action = Set`][guide-actions]: the variable then holds `true` or `false`, like the command-line value.
+This is a Clap-inspired subset: Clap's `hide_env`, `hide_env_values` and boolean parsing of environment values for flags are not supported.
 
 ## Reading the Process Environment
 
@@ -82,9 +84,10 @@ In the generated help, the variable is shown as `[env: NAME=]`, before the defau
 The macro reports a compile error, pointing at the offending attribute or field, for:
 
 - `env` values that are not a string literal, are empty, or contain `=` or NUL characters, and `env` given more than once on the same field;
-- `env` on a flag;
+- `env` on a flag (a `bool` field without `action = Set`, or a field with a flag action);
 - calling `parse` or `from_args` on a struct with `env` fields without the `std` feature.
 
+[guide-actions]: actions.md
 [guide-defaults]: defaults.md
 [guide-flatten]: flatten.md
 [guide-help]: help.md
